@@ -298,6 +298,29 @@ bool setTensorScales(const INetworkDefinition& network, float inScales = 2.0f, f
 
 } // namespace
 
+class AlgorithmCleaner : public nvinfer1::IAlgorithmSelector
+{
+public:
+    int32_t selectAlgorithms(const nvinfer1::IAlgorithmContext& context, const nvinfer1::IAlgorithm* const* choices,
+                             int32_t nbChoices, int32_t* selection) noexcept override
+    {
+        int32_t curIndex = 0;
+        for (auto i = 0; i < nbChoices; i++)
+        {
+            if (choices[i]->getAlgorithmVariant().getImplementation() != 1 || choices[i]->getAlgorithmVariant().getTactic() % 7 != 2)
+            {
+                selection[curIndex++] = i;
+            }
+        }
+        return curIndex;
+    }
+
+    void reportAlgorithms(const nvinfer1::IAlgorithmContext* const* algoContexts,
+                          const nvinfer1::IAlgorithm* const* algoChoices, int32_t nbAlgorithms) noexcept override
+    {
+    }
+};
+
 ICudaEngine* networkToEngine(const BuildOptions& build, const SystemOptions& sys, IBuilder& builder,
     INetworkDefinition& network, std::ostream& err)
 {
@@ -590,6 +613,8 @@ ICudaEngine* networkToEngine(const BuildOptions& build, const SystemOptions& sys
         config->setTacticSources(tacticSources);
     }
 
+	AlgorithmCleaner selector;
+	config->setAlgorithmSelector(&selector);
     return builder.buildEngineWithConfig(network, *config);
 }
 
